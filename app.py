@@ -6,6 +6,7 @@ from flask_cors import CORS
 from datetime import datetime
 import logging
 from instagrapi import Client
+from instagrapi.exceptions import LoginRequired
 
 # Configurar logging
 logging.basicConfig(level=logging.ERROR)
@@ -24,10 +25,53 @@ INSTAGRAM_USERNAME = os.getenv('INSTAGRAM_USERNAME')
 INSTAGRAM_PASSWORD = os.getenv('INSTAGRAM_PASSWORD')
 PROXY_URL = os.getenv('PROXY_URL')
 
+def login_user():
+    cl = Client()
+    session_file = "session.json"
+
+    login_via_session = False
+    login_via_pw = False
+
+    if os.path.exists(session_file):
+        try:
+            cl.load_settings(session_file)
+            cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+
+            # check if session is valid
+            try:
+                cl.get_timeline_feed()
+            except LoginRequired:
+                logger.info("Session is invalid, need to login via username and password")
+
+                old_session = cl.get_settings()
+
+                # use the same device uuids across logins
+                cl.set_settings({})
+                cl.set_uuids(old_session["uuids"])
+
+                cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+            login_via_session = True
+        except Exception as e:
+            logger.info("Couldn't login user using session information: %s" % e)
+
+    if not login_via_session:
+        try:
+            logger.info("Attempting to login via username and password. username: %s" % INSTAGRAM_USERNAME)
+            if cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD):
+                login_via_pw = True
+        except Exception as e:
+            logger.info("Couldn't login user using username and password: %s" % e)
+
+    if not login_via_pw and not login_via_session:
+        raise Exception("Couldn't login user with either password or session")
+
+    # Guardar la sesión
+    cl.dump_settings(session_file)
+    return cl
+
 # Iniciar sesión con la API de Instagrapi
-cl = Client()
+cl = login_user()
 cl.set_proxy(PROXY_URL)
-cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
 
 @app.route('/', methods=['GET'])
 def home():
