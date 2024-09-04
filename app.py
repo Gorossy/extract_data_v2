@@ -22,9 +22,11 @@ CORS(app)
 # Cargar credenciales de entorno
 INSTAGRAM_USERNAME = os.getenv('INSTAGRAM_USERNAME')
 INSTAGRAM_PASSWORD = os.getenv('INSTAGRAM_PASSWORD')
+PROXY_URL = os.getenv('PROXY_URL')
 
 # Iniciar sesión con la API de Instagrapi
 cl = Client()
+cl.set_proxy(PROXY_URL)
 cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
 
 @app.route('/', methods=['GET'])
@@ -100,11 +102,13 @@ def extract_using_ytdlp(url):
 def extract_instagram_data(url):
     media_id = url.split('/')[-2]
     try:
+        # Intentar primero con una solicitud pública
         try:
             media_info = cl.media_info_gql(media_id)
         except Exception as e:
+            # Si falla, intentar con una solicitud privada
             media_info = cl.media_info_v1(media_id)
-        print(media_info)
+        
         return {
             'url': url,
             'author': media_info.user.username,
