@@ -5,9 +5,11 @@ import yt_dlp
 from flask_cors import CORS
 from datetime import datetime
 from dotenv import load_dotenv
+import random
 
-# Cargar variables de entorno
-load_dotenv()
+if os.environ.get('FLASK_ENV') != 'production':
+    from dotenv import load_dotenv
+    load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -46,8 +48,13 @@ def resolve_tiktok_url(url):
         return url
 
 def extract_using_ytdlp(url):
-    scraperapi_key = os.getenv('SCRAPERAPI_KEY')
-    proxy_url = f"http://scraperapi:{scraperapi_key}@proxy-server.scraperapi.com:8001"
+    # Use the BrightData proxy credentials
+    username = 'brd-customer-hl_7c3bc58e-zone-residential_proxy1'
+    password = 'kx3zpjnf26bt'
+    port = 22225
+    session_id = random.random()
+    
+    proxy_url = f"http://{username}-session-{session_id}:{password}@brd.superproxy.io:{port}"
     
     ydl_opts = {
         'skip_download': True,
