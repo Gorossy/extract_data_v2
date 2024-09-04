@@ -5,7 +5,7 @@ import yt_dlp
 from flask_cors import CORS
 from datetime import datetime
 import logging
-from instagram_private_api import Client, ClientCompatPatch
+from instagrapi import Client
 
 # Configurar logging
 logging.basicConfig(level=logging.ERROR)
@@ -23,8 +23,9 @@ CORS(app)
 INSTAGRAM_USERNAME = os.getenv('INSTAGRAM_USERNAME')
 INSTAGRAM_PASSWORD = os.getenv('INSTAGRAM_PASSWORD')
 
-# Iniciar sesión con la API privada de Instagram
-api = Client(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+# Iniciar sesión con la API de Instagrapi
+cl = Client()
+cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
 
 @app.route('/', methods=['GET'])
 def home():
@@ -99,14 +100,18 @@ def extract_using_ytdlp(url):
 def extract_instagram_data(url):
     media_id = url.split('/')[-2]
     try:
-        media_info = api.media_info(media_id)
+        try:
+            media_info = cl.media_info_gql(media_id)
+        except Exception as e:
+            media_info = cl.media_info_v1(media_id)
+        print(media_info)
         return {
             'url': url,
-            'author': media_info['user']['username'],
-            'caption': media_info['caption']['text'] if media_info.get('caption') else None,
-            'likes': media_info['like_count'],
-            'comments': media_info['comment_count'],
-            'media_type': media_info['media_type'],
+            'author': media_info.user.username,
+            'caption': media_info.caption_text,
+            'likes': media_info.like_count,
+            'comments': media_info.comment_count,
+            'media_type': media_info.media_type,
         }
     except Exception as e:
         logger.exception(f"Error al extraer información de Instagram: {url}")
