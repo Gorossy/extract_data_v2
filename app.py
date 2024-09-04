@@ -7,6 +7,7 @@ from datetime import datetime
 import ssl
 import certifi
 import logging
+import urllib.request  # Importar urllib
 
 # Configurar logging
 logging.basicConfig(level=logging.ERROR)
