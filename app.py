@@ -4,10 +4,7 @@ from flask import Flask, request, jsonify
 import yt_dlp
 from flask_cors import CORS
 from datetime import datetime
-import ssl
-import certifi
 import logging
-import urllib.request  # Importar urllib
 
 # Configurar logging
 logging.basicConfig(level=logging.ERROR)
@@ -59,21 +56,12 @@ def extract_using_ytdlp(url):
     scraperapi_key = os.getenv('SCRAPERAPI_KEY')
     proxy_url = f"http://scraperapi:{scraperapi_key}@proxy-server.scraperapi.com:8001"
     
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    
     ydl_opts = {
         'skip_download': True,
         'proxy': proxy_url,
-        'nocheckcertificate': True,
-        'ignoreerrors': False,
-        'quiet': False,
-        'no_warnings': False,
-        'format': 'best',
-        'socket_timeout': 30,
+        'nocheckcertificate': True,  # Desactiva la verificación SSL
+        'quiet': True,
         'retries': 3,
-        'verbose': True,
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -82,10 +70,6 @@ def extract_using_ytdlp(url):
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl._opener = urllib.request.build_opener(
-                urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url}),
-                urllib.request.HTTPSHandler(context=ssl_context)
-            )
             info = ydl.extract_info(url, download=False)
         
         if not info:
