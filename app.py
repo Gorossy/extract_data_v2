@@ -19,6 +19,10 @@ if os.environ.get('FLASK_ENV') != 'production':
 app = Flask(__name__)
 CORS(app)
 
+# Autenticación de Instaloader
+INSTAGRAM_USERNAME = os.getenv('INSTAGRAM_USERNAME')
+INSTAGRAM_PASSWORD = os.getenv('INSTAGRAM_PASSWORD')
+
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({"message": "Bienvenido a la API de extracción de videos"}), 200
@@ -91,6 +95,15 @@ def extract_using_ytdlp(url):
 
 def extract_using_instaloader(url):
     L = instaloader.Instaloader()
+    
+    # Autenticarse si las credenciales están disponibles
+    if INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD:
+        try:
+            L.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+        except Exception as e:
+            logger.exception("Error al iniciar sesión en Instagram")
+            return {'url': url, 'error': 'Error al iniciar sesión en Instagram'}
+
     post_shortcode = url.split("/")[-2]
     
     try:
