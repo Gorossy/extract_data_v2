@@ -4,3 +4,4 @@ gunicorn==23.0.0
 requests==2.32.3
 yt-dlp==2024.8.6
 instagrapi==2.1.2
+python-dotenv==1.0.1
