@@ -6,6 +6,8 @@ from flask_cors import CORS
 from datetime import datetime
 import ssl
 import certifi
+import urllib.request
+import logging
 
 # Cargar variables de entorno solo si estamos en desarrollo local
 if os.environ.get('FLASK_ENV') != 'production':
@@ -56,16 +58,22 @@ def extract_using_ytdlp(url):
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
     
+    # Crear un opener personalizado con el contexto SSL
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url}),
+        urllib.request.HTTPSHandler(context=ssl_context)
+    )
+    
     ydl_opts = {
         'skip_download': True,
-        'proxy': proxy_url,
         'nocheckcertificate': True,
-        'ignoreerrors': True,
-        'quiet': True,
-        'no_warnings': True,
+        'ignoreerrors': False,
+        'quiet': False,
+        'no_warnings': False,
         'format': 'best',
         'socket_timeout': 30,
         'retries': 3,
+        'verbose': True,
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -74,7 +82,8 @@ def extract_using_ytdlp(url):
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.urlopen = lambda url, *args, **kwargs: ydl._opener.open(url, *args, **kwargs, context=ssl_context)
+            # Usar el opener personalizado
+            ydl._opener = opener
             info = ydl.extract_info(url, download=False)
         
         if not info:
@@ -96,7 +105,8 @@ def extract_using_ytdlp(url):
             'shares': info.get('repost_count')
         }
     except Exception as e:
-        return {'url': url, 'error': str(e)}
+        logger.exception(f"Error al extraer información de: {url}")
+        return {'url': url, 'error': str(e), 'traceback': logging.traceback.format_exc()}
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 8080))
