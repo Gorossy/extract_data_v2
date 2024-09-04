@@ -5,6 +5,7 @@ import yt_dlp
 from flask_cors import CORS
 from datetime import datetime
 import logging
+import instaloader
 
 # Configurar logging
 logging.basicConfig(level=logging.ERROR)
@@ -34,10 +35,11 @@ def extract_video_data():
         try:
             if 'tiktok.com/t/' in url:
                 resolved_url = resolve_tiktok_url(url)
+            elif 'instagram.com' in url:
+                result = extract_using_instaloader(url)
             else:
                 resolved_url = url
-
-            result = extract_using_ytdlp(resolved_url)
+                result = extract_using_ytdlp(resolved_url)
             results.append(result)
         except Exception as e:
             logger.exception(f"Error al procesar URL: {url}")
@@ -54,11 +56,11 @@ def resolve_tiktok_url(url):
 
 def extract_using_ytdlp(url):
     scraperapi_key = os.getenv('SCRAPERAPI_KEY')
-    #proxy_url = f"http://scraperapi:{scraperapi_key}@proxy-server.scraperapi.com:8001"
+    proxy_url = f"http://scraperapi:{scraperapi_key}@proxy-server.scraperapi.com:8001"
     
     ydl_opts = {
         'skip_download': True,
-        #'proxy': proxy_url,
+        'proxy': proxy_url,
     }
     
     try:
@@ -85,6 +87,28 @@ def extract_using_ytdlp(url):
         }
     except Exception as e:
         logger.exception(f"Error al extraer información de: {url}")
+        return {'url': url, 'error': str(e)}
+
+def extract_using_instaloader(url):
+    L = instaloader.Instaloader()
+    post_shortcode = url.split("/")[-2]
+    
+    try:
+        post = instaloader.Post.from_shortcode(L.context, post_shortcode)
+        
+        return {
+            'url': url,
+            'title': post.title,
+            'upload_date': post.date.strftime('%Y-%m-%d'),
+            'author': post.owner_username,
+            'likes': post.likes,
+            'comments': post.comments,
+            'is_video': post.is_video,
+            'video_url': post.video_url if post.is_video else None,
+            'image_url': post.url if not post.is_video else None
+        }
+    except Exception as e:
+        logger.exception(f"Error al extraer información de Instagram: {url}")
         return {'url': url, 'error': str(e)}
 
 if __name__ == '__main__':
