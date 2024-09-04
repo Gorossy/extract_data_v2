@@ -4,6 +4,8 @@ from flask import Flask, request, jsonify
 import yt_dlp
 from flask_cors import CORS
 from datetime import datetime
+import ssl
+import certifi
 
 # Cargar variables de entorno solo si estamos en desarrollo local
 if os.environ.get('FLASK_ENV') != 'production':
@@ -50,14 +52,33 @@ def extract_using_ytdlp(url):
     scraperapi_key = os.getenv('SCRAPERAPI_KEY')
     proxy_url = f"http://scraperapi:{scraperapi_key}@proxy-server.scraperapi.com:8001"
     
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    
     ydl_opts = {
         'skip_download': True,
         'proxy': proxy_url,
+        'nocheckcertificate': True,
+        'ignoreerrors': True,
+        'quiet': True,
+        'no_warnings': True,
+        'format': 'best',
+        'socket_timeout': 30,
+        'retries': 3,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.urlopen = lambda url, *args, **kwargs: ydl._opener.open(url, *args, **kwargs, context=ssl_context)
             info = ydl.extract_info(url, download=False)
+        
+        if not info:
+            raise Exception("No se pudo extraer la información del video")
         
         upload_date = info.get('upload_date')
         if upload_date:
