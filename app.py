@@ -53,7 +53,6 @@ def extract_using_ytdlp(url):
     ydl_opts = {
         'skip_download': True,
         'proxy': proxy_url,
-        'nocheckcertificate': True
     }
     
     try:
