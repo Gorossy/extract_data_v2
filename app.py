@@ -5,7 +5,7 @@ import yt_dlp
 from flask_cors import CORS
 from datetime import datetime
 import logging
-import instaloader
+from instagram_private_api import Client, ClientCompatPatch
 
 # Configurar logging
 logging.basicConfig(level=logging.ERROR)
@@ -19,9 +19,12 @@ if os.environ.get('FLASK_ENV') != 'production':
 app = Flask(__name__)
 CORS(app)
 
-# Autenticación de Instaloader
+# Cargar credenciales de entorno
 INSTAGRAM_USERNAME = os.getenv('INSTAGRAM_USERNAME')
 INSTAGRAM_PASSWORD = os.getenv('INSTAGRAM_PASSWORD')
+
+# Iniciar sesión con la API privada de Instagram
+api = Client(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
 
 @app.route('/', methods=['GET'])
 def home():
@@ -37,13 +40,13 @@ def extract_video_data():
 
     for url in urls:
         try:
-            if 'tiktok.com/t/' in url:
+            if 'instagram.com' in url:
+                result = extract_instagram_data(url)
+            elif 'tiktok.com/t/' in url:
                 resolved_url = resolve_tiktok_url(url)
-            elif 'instagram.com' in url:
-                result = extract_using_instaloader(url)
-            else:
-                resolved_url = url
                 result = extract_using_ytdlp(resolved_url)
+            else:
+                result = extract_using_ytdlp(url)
             results.append(result)
         except Exception as e:
             logger.exception(f"Error al procesar URL: {url}")
@@ -93,32 +96,17 @@ def extract_using_ytdlp(url):
         logger.exception(f"Error al extraer información de: {url}")
         return {'url': url, 'error': str(e)}
 
-def extract_using_instaloader(url):
-    L = instaloader.Instaloader()
-    
-    # Autenticarse si las credenciales están disponibles
-    if INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD:
-        try:
-            L.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
-        except Exception as e:
-            logger.exception("Error al iniciar sesión en Instagram")
-            return {'url': url, 'error': 'Error al iniciar sesión en Instagram'}
-
-    post_shortcode = url.split("/")[-2]
-    
+def extract_instagram_data(url):
+    media_id = url.split('/')[-2]
     try:
-        post = instaloader.Post.from_shortcode(L.context, post_shortcode)
-        
+        media_info = api.media_info(media_id)
         return {
             'url': url,
-            'title': post.title,
-            'upload_date': post.date.strftime('%Y-%m-%d'),
-            'author': post.owner_username,
-            'likes': post.likes,
-            'comments': post.comments,
-            'is_video': post.is_video,
-            'video_url': post.video_url if post.is_video else None,
-            'image_url': post.url if not post.is_video else None
+            'author': media_info['user']['username'],
+            'caption': media_info['caption']['text'] if media_info.get('caption') else None,
+            'likes': media_info['like_count'],
+            'comments': media_info['comment_count'],
+            'media_type': media_info['media_type'],
         }
     except Exception as e:
         logger.exception(f"Error al extraer información de Instagram: {url}")
